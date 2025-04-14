@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Store - Order</title>
+    <link rel="stylesheet" href="/static/styles/order.css">
+</head>
+
+<body>
+    <header class="header">
+        <h1 class="header__title">Food Store</h1>
+        <nav class="header__nav">
+            <a href="/order" class="header__nav-link active">Order</a>
+            <a href="/admin" class="header__nav-link">Admin Panel</a>
+        </nav>
+        <div class="header__cart" id="cart-icon">
+            <span class="header__cart-icon">🛒</span>
+            <span class="header__cart-count" id="cart-count">0</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <section class="main__products">
+            <h2 class="main__products-title">Available Products</h2>
+            
+            <div class="main__products-filters">
+                <input type="text" id="name-filter" placeholder="Search by name" class="main__products-filter-input">
+                <div class="main__products-filter-price">
+                    <input type="number" id="min-price" placeholder="Min price" class="main__products-filter-input">
+                    <input type="number" id="max-price" placeholder="Max price" class="main__products-filter-input">
+                </div>
+                <button id="apply-filters" class="main__products-filter-button">Apply filters</button>
+                <button id="reset-filters" class="main__products-filter-button reset">Reset</button>
+            </div>
+
+            <div class="main__products-list" id="products-list">
+            </div>
+            <div id="pagination" class="main__pagination"></div>
+        </section>
+
+        <section class="main__cart" id="cart-section">
+            <h2 class="main__cart-title">Cart</h2>
+            <div class="main__cart-items" id="cart-items">
+                <div class="main__cart-empty" id="cart-empty">Cart is empty</div>
+            </div>
+            <div class="main__cart-total">
+                <span>Total:</span>
+                <span id="cart-total">0 ₸</span>
+            </div>
+            <form id="order-form" class="main__cart-form">
+                <input type="text" id="user-id" name="user-id" placeholder="Your ID (e.g. email)" required class="main__cart-form-input">
+                <button type="submit" class="main__cart-form-button" id="checkout-button" disabled>Checkout</button>
+            </form>
+        </section>
+
+        <section class="main__orders" id="orders-section">
+            <h2 class="main__orders-title">Your Orders</h2>
+            <div class="main__orders-filter">
+                <input type="text" id="user-id-filter" placeholder="Enter your ID to view orders" class="main__orders-filter-input">
+                <button id="view-orders" class="main__orders-filter-button">Show orders</button>
+            </div>
+            <div class="main__orders-list" id="orders-list">
+
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/scripts/order.js"></script>
+</body>
+
+</html>

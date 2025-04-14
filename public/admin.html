@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Store</title>
+    <link rel="stylesheet" href="/static/styles/admin.css?v=1.0.1">
+</head>
+
+<body>
+    <header class="header">
+        <h1 class="header__title">
+            Food Store Admin Panel
+        </h1>
+        <nav class="header__nav">
+            <a href="/order" class="header__nav-link">Order</a>
+            <a href="/admin" class="header__nav-link active">Admin Panel</a>
+        </nav>
+    </header>
+
+    <main class="main">
+
+        
+
+        <section class="main__products">
+            <h2 class="main__products-title">Add Product</h2>
+
+            <form class="main__products-form" id="addProduct-form">
+
+                <div class="main__products-form-wrap">
+                    <input class="main__products-form-input" type="text" name="productName" placeholder="Product Name"
+                        required>
+                    <input class="main__products-form-input" type="number" name="productPrice"
+                        placeholder="Product Price" min="0" required>
+                    <input class="main__products-form-input" type="number" name="productStock"
+                        placeholder="Product Stock" min="0" required>
+                </div>
+                <button class="main__products-form-button" type="submit">Add Product</button>
+
+            </form>
+
+            <hr class="main__products-line">
+
+            <h2 class="main__products-title">Products</h2>
+
+            <form class="main__products-filter" id="filterProduct-form">
+                <div class="main__products-filter-wrap">
+                    <input class="main__products-filter-input" type="number" name="minPrice" placeholder="Min Price" min="0">
+                    <input class="main__products-filter-input" type="number" name="maxPrice" placeholder="Max Price" min="0">
+                </div>
+                <button class="main__products-filter-button" type="submit">🔎</button>
+            </form>
+
+            <div class="main__products-list" id="products-list"></div>
+        </section>
+
+        <div id="pagination" class="main__pagination">
+            <button class="main__pagination-button main__pagination-button-prev">⬅️</button>
+            <div class="main__pagination-numbers"></div>
+            <button class="main__pagination-button main__pagination-button-next">➡️</button>
+        </div>
+    </main>
+
+    <script src="/static/scripts/admin.js"></script>
+</body>
+
+</html>
