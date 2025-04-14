@@ -1,8 +1,11 @@
 package usecase
 
 import (
-    "FoodStore-AdvProg2/domain"
-    "FoodStore-AdvProg2/repository"
+	"FoodStore-AdvProg2/domain"
+	"FoodStore-AdvProg2/repository"
+	"errors"
+
+	"github.com/google/uuid"
 )
 
 type ProductUseCase struct {
@@ -14,6 +17,10 @@ func NewProductUseCase(repo repository.ProductRepository) *ProductUseCase {
 }
 
 func (uc *ProductUseCase) Create(p domain.Product) error {
+	if p.Name == "" || p.Price <= 0 || p.Stock < 0 {
+		return errors.New("invalid product data")
+	}
+	p.ID = uuid.New().String()
 	return uc.Repo.Save(p)
 }
 
@@ -22,6 +29,9 @@ func (uc *ProductUseCase) GetByID(id string) (domain.Product, error) {
 }
 
 func (uc *ProductUseCase) Update(id string, p domain.Product) error {
+	if p.Name == "" || p.Price <= 0 || p.Stock < 0 {
+		return errors.New("invalid product data")
+	}
 	return uc.Repo.Update(id, p)
 }
 
@@ -30,14 +40,14 @@ func (uc *ProductUseCase) Delete(id string) error {
 }
 
 func (uc *ProductUseCase) List(filter domain.FilterParams, pagination domain.PaginationParams) ([]domain.Product, int, error) {
-    if pagination.Page < 1 {
-        pagination.Page = 1
-    }
-    if pagination.PerPage < 1 {
-        pagination.PerPage = 10 
-    }
-    offset := (pagination.Page - 1) * pagination.PerPage
-    
-    products, total, err := uc.Repo.FindAllWithFilter(filter, pagination, offset)
-    return products, total, err
+	if pagination.Page < 1 {
+		pagination.Page = 1
+	}
+	if pagination.PerPage < 1 {
+		pagination.PerPage = 10
+	}
+	offset := (pagination.Page - 1) * pagination.PerPage
+
+	products, total, err := uc.Repo.FindAllWithFilter(filter, pagination, offset)
+	return products, total, err
 }

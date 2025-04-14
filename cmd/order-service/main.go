@@ -2,16 +2,130 @@ package main
 
 import (
 	"FoodStore-AdvProg2/domain"
+	"FoodStore-AdvProg2/infrastructure/grpc"
 	"FoodStore-AdvProg2/infrastructure/postgres"
+	"FoodStore-AdvProg2/proto"
 	"FoodStore-AdvProg2/usecase"
+	"context"
 	"log"
-	"net/http"
+	"net"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	grpcpkg "google.golang.org/grpc"
 )
 
+type orderServer struct {
+	proto.UnimplementedOrderServiceServer
+	uc *usecase.OrderUseCase
+}
+
+func NewOrderServer(uc *usecase.OrderUseCase) *orderServer {
+	return &orderServer{uc: uc}
+}
+
+func (s *orderServer) CreateOrder(ctx context.Context, req *proto.CreateOrderRequest) (*proto.CreateOrderResponse, error) {
+	items := make([]domain.OrderItemRequest, len(req.Items))
+	for i, item := range req.Items {
+		items[i] = domain.OrderItemRequest{
+			ProductID: item.ProductId,
+			Quantity:  int(item.Quantity),
+		}
+	}
+
+	orderReq := domain.OrderRequest{
+		UserID: req.UserId,
+		Items:  items,
+	}
+
+	orderID, err := s.uc.CreateOrder(orderReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &proto.CreateOrderResponse{OrderId: orderID}, nil
+}
+
+func (s *orderServer) GetOrder(ctx context.Context, req *proto.GetOrderRequest) (*proto.OrderResponse, error) {
+	order, err := s.uc.GetOrderByID(req.OrderId)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]*proto.OrderItem, len(order.Items))
+	for i, item := range order.Items {
+		items[i] = &proto.OrderItem{
+			Id:        item.ID,
+			OrderId:   item.OrderID,
+			ProductId: item.ProductID,
+			Quantity:  int32(item.Quantity),
+			Price:     item.Price,
+		}
+	}
+
+	return &proto.OrderResponse{
+		Id:         order.ID,
+		UserId:     order.UserID,
+		TotalPrice: order.TotalPrice,
+		Status:     order.Status,
+		CreatedAt:  order.CreatedAt.Unix(),
+		Items:      items,
+	}, nil
+}
+
+func (s *orderServer) UpdateOrderStatus(ctx context.Context, req *proto.UpdateOrderStatusRequest) (*proto.UpdateOrderStatusResponse, error) {
+	err := s.uc.UpdateOrderStatus(req.OrderId, req.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	return &proto.UpdateOrderStatusResponse{Status: "updated"}, nil
+}
+
+func (s *orderServer) GetUserOrders(ctx context.Context, req *proto.GetUserOrdersRequest) (*proto.GetUserOrdersResponse, error) {
+	var orders []domain.Order
+	var err error
+
+	if req.UserId == "" {
+		orders, err = s.uc.GetAllOrders()
+	} else {
+		orders, err = s.uc.GetOrdersByUserID(req.UserId)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	responseOrders := make([]*proto.OrderResponse, len(orders))
+	for i, order := range orders {
+		items := make([]*proto.OrderItem, len(order.Items))
+		for j, item := range order.Items {
+			items[j] = &proto.OrderItem{
+				Id:        item.ID,
+				OrderId:   item.OrderID,
+				ProductId: item.ProductID,
+				Quantity:  int32(item.Quantity),
+				Price:     item.Price,
+			}
+		}
+		responseOrders[i] = &proto.OrderResponse{
+			Id:         order.ID,
+			UserId:     order.UserID,
+			TotalPrice: order.TotalPrice,
+			Status:     order.Status,
+			CreatedAt:  order.CreatedAt.Unix(),
+			Items:      items,
+		}
+	}
+
+	return &proto.GetUserOrdersResponse{Orders: responseOrders}, nil
+}
+func (s *orderServer) DeleteOrderItemsByProduct(ctx context.Context, req *proto.DeleteOrderItemsByProductRequest) (*proto.DeleteOrderItemsByProductResponse, error) {
+    err := s.uc.DeleteOrderItemsByProduct(req.ProductId)
+    if err != nil {
+        return nil, err
+    }
+    return &proto.DeleteOrderItemsByProductResponse{Success: true}, nil
+}
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -22,88 +136,35 @@ func main() {
 	if dbHost == "" {
 		log.Fatal("DB environment variable not set")
 	}
-	postgres.InitDB(dbHost)
-	log.Println("Connected to PostgreSQL")
+
+	db, err := postgres.InitDB(dbHost)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	postgres.DB = db 
+	log.Println("Connected to PostgreSQL via pgxpool")
 
 	if err := postgres.InitTables(); err != nil {
 		log.Fatalf("Failed to initialize tables: %v", err)
 	}
 
 	orderRepo := postgres.NewOrderPostgresRepo()
-	productRepo := postgres.NewProductPostgresRepo()
-	orderUC := usecase.NewOrderUseCase(orderRepo, productRepo)
+	userClient, userConn := grpc.NewUserClient("localhost:50052")
+	defer userConn.Close()
+	productClient, productConn := grpc.NewProductClient("localhost:50053")
+	defer productConn.Close()
+	uc := usecase.NewOrderUseCase(orderRepo, productClient, userClient)
 
-	r := gin.Default()
-
-	orders := r.Group("/api/orders")
-	{
-		orders.POST("", func(c *gin.Context) {
-			var orderReq domain.OrderRequest
-			if err := c.ShouldBindJSON(&orderReq); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-				return
-			}
-
-			orderID, err := orderUC.CreateOrder(orderReq)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusCreated, gin.H{"order_id": orderID})
-		})
-
-		orders.GET("", func(c *gin.Context) {
-			userID := c.Query("user_id")
-			var orders []domain.Order
-			var err error
-
-			if userID != "" {
-				orders, err = orderUC.GetOrdersByUserID(userID)
-			} else {
-				orders, err = orderUC.GetAllOrders()
-			}
-
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusOK, orders)
-		})
-
-		orders.GET("/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			order, err := orderUC.GetOrderByID(id)
-			if err != nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
-				return
-			}
-			c.JSON(http.StatusOK, order)
-		})
-
-		orders.PATCH("/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			var statusReq domain.OrderStatusUpdateRequest
-			if err := c.ShouldBindJSON(&statusReq); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-				return
-			}
-
-			if err := orderUC.UpdateOrderStatus(id, statusReq.Status); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{"status": "updated"})
-		})
+	listener, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	port := os.Getenv("ORDER_SERVICE_PORT")
-	if port == "" {
-		port = "8082"
-	}
+	grpcServer := grpcpkg.NewServer()
+	proto.RegisterOrderServiceServer(grpcServer, NewOrderServer(uc))
 
-	log.Printf("Order Service is starting on port %s...", port)
-	r.Run(":" + port)
+	log.Println("Starting gRPC server on :50051...")
+	if err := grpcServer.Serve(listener); err != nil {
+		log.Fatalf("Failed to serve: %v", err)
+	}
 }
